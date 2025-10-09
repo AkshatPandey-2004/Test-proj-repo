@@ -1,0 +1,21 @@
+{
+  "name": "user-service",
+  "version": "1.0.0",
+  "description": "Base dependencies for microservice architecture.",
+  "main": "backend.js",
+  "type": "module",
+  "scripts": {
+    "start": "node backend.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.535.0",
+    "@aws-sdk/client-ec2": "^3.535.0",
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.2.3"
+  }
+}
