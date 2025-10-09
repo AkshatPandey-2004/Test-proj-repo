@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Base dependencies for microservice architecture.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },

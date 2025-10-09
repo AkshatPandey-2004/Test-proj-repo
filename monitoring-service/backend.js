@@ -18,9 +18,9 @@ app.use(express.json());
 
 /**
  * Fetches required credentials (keys and region) from the User Service.
- * Corrected API path to include '/user' and '/aws' provider.
+ * Now also accepts a region override parameter
  */
-async function getCredentials(userId) {
+async function getCredentials(userId, regionOverride = null) {
   try {
     const response = await axios.get(`${USER_SERVICE_URL}/api/user/credentials/${userId}/aws`);
     const data = response.data;
@@ -35,7 +35,7 @@ async function getCredentials(userId) {
     return {
       accessKeyId: creds.accessKeyId,
       secretAccessKey: creds.secretAccessKey,
-      region: creds.region || 'us-east-1',
+      region: regionOverride || creds.region || 'us-east-1', // Use override if provided
     };
   } catch (error) {
     console.error(`❌ Failed to fetch credentials for user ${userId}: ${error.message}`);
@@ -44,7 +44,7 @@ async function getCredentials(userId) {
     const fallbackKeys = {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: regionOverride || process.env.AWS_REGION || 'us-east-1',
     };
 
     if (!fallbackKeys.accessKeyId || !fallbackKeys.secretAccessKey) {
@@ -56,13 +56,11 @@ async function getCredentials(userId) {
   }
 }
 
-
 /**
  * Fetches a single CloudWatch metric statistic for a specific instance.
  */
 async function getCloudWatchMetric(client, instanceId, metricName, statistic) {
     const now = new Date();
-    // Fetch data for the last 5 minutes, summarized every minute (60s period)
     const startTime = new Date(now.getTime() - 1000 * 60 * 5); 
     const endTime = now;
 
@@ -72,90 +70,121 @@ async function getCloudWatchMetric(client, instanceId, metricName, statistic) {
         Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
         StartTime: startTime,
         EndTime: endTime,
-        Period: 60, // 1 minute
+        Period: 60,
         Statistics: [statistic],
     };
 
     const command = new GetMetricStatisticsCommand(params);
     const response = await client.send(command);
     
-    // Process Datapoints to get the latest value
     const dataPoints = response.Datapoints || [];
     if (dataPoints.length > 0) {
-        // Sort by timestamp and get the latest
         dataPoints.sort((a, b) => b.Timestamp.getTime() - a.Timestamp.getTime());
-        // Return the requested statistic value (e.g., Average, Sum)
         return dataPoints[0][statistic];
     }
     return 'N/A';
 }
 
-// --- API Route ---
+// --- API Route with Region Support ---
 
 app.get('/api/metrics/:userId', async (req, res) => {
     const { userId } = req.params;
+    const { region } = req.query; // Get region from query parameter
 
     try {
-        // 1. Get credentials (either from User Service or ENV fallback)
-        const { accessKeyId, secretAccessKey, region } = await getCredentials(userId);
+        console.log(`📊 Fetching metrics for user: ${userId}, region: ${region || 'default'}`);
+        
+        // 1. Get credentials with optional region override
+        const { accessKeyId, secretAccessKey, region: finalRegion } = await getCredentials(userId, region);
 
-        // 2. Initialize AWS clients using the retrieved temporary credentials
-        const awsConfig = {
-            region: region,
+        console.log(`🌍 Using region: ${finalRegion}`);
+
+        // 2. Initialize AWS SDK clients with the specified region
+        const ec2Client = new EC2Client({
+            region: finalRegion,
             credentials: {
                 accessKeyId,
                 secretAccessKey,
             },
-        };
-        const ec2Client = new EC2Client(awsConfig);
-        const cwClient = new CloudWatchClient(awsConfig);
+        });
 
-        // 3. Get list of EC2 instances
+        const cloudWatchClient = new CloudWatchClient({
+            region: finalRegion,
+            credentials: {
+                accessKeyId,
+                secretAccessKey,
+            },
+        });
+
+        // 3. Describe EC2 instances in the specified region
         const describeCommand = new DescribeInstancesCommand({});
-        const ec2Response = await ec2Client.send(describeCommand);
+        const ec2Data = await ec2Client.send(describeCommand);
 
-        let resources = [];
+        if (!ec2Data.Reservations || ec2Data.Reservations.length === 0) {
+            return res.status(200).send({
+                message: `No EC2 instances found in region ${finalRegion}.`,
+                region: finalRegion,
+                resources: []
+            });
+        }
 
-        for (const reservation of ec2Response.Reservations || []) {
-            for (const instance of reservation.Instances || []) {
+        // 4. Process instances and fetch metrics
+        const instances = [];
+        for (const reservation of ec2Data.Reservations) {
+            for (const instance of reservation.Instances) {
                 const instanceId = instance.InstanceId;
-                const nameTag = instance.Tags?.find(tag => tag.Key === 'Name')?.Value || instanceId;
+                const instanceName = instance.Tags?.find(tag => tag.Key === 'Name')?.Value || 'Unnamed';
+                const state = instance.State.Name;
 
-                // 4. Fetch metrics for each instance (simultaneously for speed)
-                const [cpu, networkIn, networkOut] = await Promise.all([
-                    // Changed period to 5 minutes to get more immediate data points
-                    getCloudWatchMetric(cwClient, instanceId, 'CPUUtilization', 'Average'),
-                    getCloudWatchMetric(cwClient, instanceId, 'NetworkIn', 'Sum'),
-                    getCloudWatchMetric(cwClient, instanceId, 'NetworkOut', 'Sum'),
-                ]);
+                // Fetch CloudWatch metrics only for running instances
+                let cpuUtilization = 'N/A';
+                let networkIn = 'N/A';
+                let networkOut = 'N/A';
 
-                resources.push({
-                    type: 'EC2',
+                if (state === 'running') {
+                    try {
+                        cpuUtilization = await getCloudWatchMetric(cloudWatchClient, instanceId, 'CPUUtilization', 'Average');
+                        networkIn = await getCloudWatchMetric(cloudWatchClient, instanceId, 'NetworkIn', 'Sum');
+                        networkOut = await getCloudWatchMetric(cloudWatchClient, instanceId, 'NetworkOut', 'Sum');
+
+                        // Format values
+                        cpuUtilization = typeof cpuUtilization === 'number' ? cpuUtilization.toFixed(2) : 'N/A';
+                        networkIn = typeof networkIn === 'number' ? `${(networkIn / 1024).toFixed(2)} KB` : 'N/A';
+                        networkOut = typeof networkOut === 'number' ? `${(networkOut / 1024).toFixed(2)} KB` : 'N/A';
+                    } catch (metricError) {
+                        console.error(`⚠️ Error fetching metrics for ${instanceId}:`, metricError.message);
+                    }
+                }
+
+                instances.push({
                     id: instanceId,
-                    name: nameTag,
-                    state: instance.State?.Name,
+                    name: instanceName,
+                    state: state,
                     metrics: {
-                        // Format the data
-                        cpuUtilization: typeof cpu === 'number' ? cpu.toFixed(2) : 'N/A', // Removed % for easier math on frontend
-                        networkIn: typeof networkIn === 'number' ? (networkIn / 1024 / 1024).toFixed(2) + ' MiB' : 'N/A', 
-                        networkOut: typeof networkOut === 'number' ? (networkOut / 1024 / 1024).toFixed(2) + ' MiB' : 'N/A',
+                        cpuUtilization,
+                        networkIn,
+                        networkOut,
                     },
                 });
             }
         }
 
-        res.status(200).json({ region: awsConfig.region, resources });
+        console.log(`✅ Successfully fetched ${instances.length} instances from ${finalRegion}`);
+
+        res.status(200).send({
+            region: finalRegion,
+            resources: instances,
+        });
+
     } catch (error) {
-        // The console log will now show the underlying AWS error more clearly
-        console.error('Monitoring Service AWS Error:', error.message);
-        // Send a clean error message back to the frontend
-        res.status(500).json({ 
-            message: 'Metrics Error: Failed to fetch AWS data. Check credentials, IAM permissions, or region.', 
-            error: error.message 
+        console.error('❌ Error in /api/metrics:', error);
+        res.status(500).send({
+            message: error.message || 'Failed to fetch metrics from AWS.',
+            region: region || 'unknown'
         });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Monitoring Service listening on port ${PORT}`);
+    console.log(`✅ Monitoring Service running on port ${PORT}`);
 });
