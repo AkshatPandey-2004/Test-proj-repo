@@ -254,12 +254,17 @@ app.post('/api/alerts/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log('📬 Create alert request for user:', userId);
+    console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
     const response = await axios.post(`${ALERT_SERVICE_URL}/api/alerts/${userId}`, req.body, {
       timeout: 10000
     });
     res.status(response.status).send(response.data);
   } catch (error) {
     console.error('❌ Create alert error:', error.message);
+    if (error.response) {
+      console.error('📋 Error details:', JSON.stringify(error.response.data, null, 2));
+      console.error('📊 Status code:', error.response.status);
+    }
     const status = error.response ? error.response.status : 500;
     const message = error.response 
       ? error.response.data 

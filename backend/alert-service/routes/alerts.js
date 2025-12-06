@@ -78,22 +78,32 @@ router.get('/:userId/:alertId', async (req, res) => {
 // CREATE new alert
 router.post('/:userId', async (req, res) => {
   try {
-    const { error, value } = alertSchema.validate(req.body);
+    console.log('📥 Received alert creation request for user:', req.params.userId);
+    console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { error, value } = alertSchema.validate(req.body, { abortEarly: false });
     
     if (error) {
+      console.error('❌ Validation failed:', error.details.map(d => d.message));
       return res.status(400).json({ 
         success: false, 
         message: 'Validation error', 
-        errors: error. details. map(d => d.message) 
+        errors: error.details.map(d => ({
+          field: d.path.join('.'),
+          message: d.message,
+          type: d.type
+        }))
       });
     }
 
+    console.log('✅ Validation passed, creating alert...');
     const alert = new Alert({
-      ... value,
-      userId: req. params.userId
+      ...value,
+      userId: req.params.userId
     });
 
     await alert.save();
+    console.log('✅ Alert created successfully:', alert._id);
     
     res.status(201).json({ 
       success: true, 
@@ -101,8 +111,13 @@ router.post('/:userId', async (req, res) => {
       alert 
     });
   } catch (error) {
-    console.error('Error creating alert:', error);
-    res.status(500).json({ success: false, message: 'Failed to create alert' });
+    console.error('❌ Error creating alert:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create alert',
+      error: error.message 
+    });
   }
 });
 

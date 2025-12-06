@@ -142,6 +142,27 @@ const CreateAlert = ({ userId, onLogout }) => {
       return;
     }
 
+    // Remove empty email recipients
+    const cleanedFormData = {
+      ...formData,
+      notifications: {
+        ...formData.notifications,
+        email: {
+          ...formData.notifications.email,
+          recipients: formData.notifications.email.recipients.filter(email => email.trim() !== '')
+        }
+      }
+    };
+
+    // Validate at least one email recipient if email notifications enabled
+    if (cleanedFormData.notifications.email.enabled && cleanedFormData.notifications.email.recipients.length === 0) {
+      setError('Please provide at least one email recipient or disable email notifications');
+      setLoading(false);
+      return;
+    }
+
+    console.log('📤 Submitting alert data:', JSON.stringify(cleanedFormData, null, 2));
+
     try {
       const url = isEdit 
         ? `${API_GATEWAY_URL}/api/alerts/${userId}/${alertId}`
@@ -150,7 +171,7 @@ const CreateAlert = ({ userId, onLogout }) => {
       const res = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanedFormData)
       });
 
       const data = await res.json();
@@ -159,11 +180,20 @@ const CreateAlert = ({ userId, onLogout }) => {
         setSuccess(isEdit ? 'Alert updated successfully!' : 'Alert created successfully!');
         setTimeout(() => navigate('/alerts'), 1500);
       } else {
-        setError(data.message || 'Failed to save alert');
+        console.error('❌ Server error:', data);
+        // Display detailed validation errors if available
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorMessages = data.errors.map(err => 
+            typeof err === 'string' ? err : `${err.field}: ${err.message}`
+          ).join(', ');
+          setError(`Validation failed: ${errorMessages}`);
+        } else {
+          setError(data.message || 'Failed to save alert');
+        }
       }
     } catch (error) {
-      console.error('Error saving alert:', error);
-      setError('Failed to save alert');
+      console.error('❌ Error saving alert:', error);
+      setError('Failed to save alert. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
