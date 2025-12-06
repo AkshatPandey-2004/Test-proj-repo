@@ -186,6 +186,26 @@ app.get('/api/data/costs/:userId', async (req, res) => {
   }
 });
 
+// Get Resources for Alert Creation
+app.get('/api/data/resources/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { service, region } = req.query;
+    
+    const url = `${MONITORING_SERVICE_URL}/api/resources/${userId}?service=${service || ''}&region=${region || ''}`;
+    
+    const response = await axios.get(url, { timeout: 30000 });
+    res.status(response.status).send(response.data);
+  } catch (error) {
+    console.error('❌ Get resources error:', error.message);
+    const status = error.response ? error.response.status : 500;
+    const message = error.response 
+      ? error.response.data.message 
+      : 'Gateway Error: Failed to connect to Monitoring Service';
+    res.status(status).send({ message });
+  }
+});
+
 // Debug Cost Route
 app.get('/api/data/costs/debug/:userId', async (req, res) => {
   try {

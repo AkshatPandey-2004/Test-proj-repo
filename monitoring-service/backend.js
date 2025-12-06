@@ -886,6 +886,135 @@ app.get('/api/costs/debug/:userId', async (req, res) => {
     }
 });
 
+// Resource Listing Route for Alert Creation
+app.get('/api/resources/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const { service, region } = req.query;
+
+    try {
+        // Validate service parameter
+        if (!service) {
+            return res.status(400).send({
+                message: 'Service parameter is required. Must be one of: EC2, S3, RDS, Lambda, EBS'
+            });
+        }
+
+        console.log(`📋 Fetching resources for user: ${userId}, service: ${service}, region: ${region || 'default'}`);
+        
+        const { accessKeyId, secretAccessKey, region: finalRegion } = await getCredentials(userId, region);
+        console.log(`🌍 Using region: ${finalRegion}`);
+
+        const credentials = { accessKeyId, secretAccessKey };
+
+        let resources = [];
+
+        switch (service.toUpperCase()) {
+            case 'EC2':
+                const ec2Client = new EC2Client({ region: finalRegion, credentials });
+                const cloudWatchClient = new CloudWatchClient({ region: finalRegion, credentials });
+                const instances = await fetchEC2Instances(ec2Client, cloudWatchClient);
+                resources = instances.map(i => ({
+                    id: i.id,
+                    name: i.name,
+                    displayName: `${i.id} (${i.name}) - ${i.state} - ${i.instanceType}`,
+                    state: i.state,
+                    type: i.instanceType,
+                    metadata: {
+                        cpuUtilization: i.metrics.cpuUtilization
+                    }
+                }));
+                break;
+
+            case 'S3':
+                const s3Client = new S3Client({ region: finalRegion, credentials });
+                const s3CloudWatchClient = new CloudWatchClient({ region: finalRegion, credentials });
+                const buckets = await fetchS3Buckets(s3Client, s3CloudWatchClient, finalRegion);
+                resources = buckets.map(b => ({
+                    id: b.name,
+                    name: b.name,
+                    displayName: `${b.name} (${b.region}) - ${b.sizeDisplay}`,
+                    region: b.region,
+                    metadata: {
+                        size: b.sizeDisplay,
+                        objectCount: b.numberOfObjects
+                    }
+                }));
+                break;
+
+            case 'RDS':
+                const rdsClient = new RDSClient({ region: finalRegion, credentials });
+                const rdsCloudWatchClient = new CloudWatchClient({ region: finalRegion, credentials });
+                const databases = await fetchRDSInstances(rdsClient, rdsCloudWatchClient);
+                resources = databases.map(db => ({
+                    id: db.identifier,
+                    name: db.identifier,
+                    displayName: `${db.identifier} (${db.engine}) - ${db.status}`,
+                    status: db.status,
+                    metadata: {
+                        engine: db.engine,
+                        instanceClass: db.instanceClass
+                    }
+                }));
+                break;
+
+            case 'LAMBDA':
+                const lambdaClient = new LambdaClient({ region: finalRegion, credentials });
+                const lambdaCloudWatchClient = new CloudWatchClient({ region: finalRegion, credentials });
+                const functions = await fetchLambdaFunctions(lambdaClient, lambdaCloudWatchClient);
+                resources = functions.map(f => ({
+                    id: f.name,
+                    name: f.name,
+                    displayName: `${f.name} (${f.runtime})`,
+                    runtime: f.runtime,
+                    metadata: {
+                        memorySize: f.memorySize,
+                        timeout: f.timeout
+                    }
+                }));
+                break;
+
+            case 'EBS':
+                const ebsClient = new EC2Client({ region: finalRegion, credentials });
+                const ebsCloudWatchClient = new CloudWatchClient({ region: finalRegion, credentials });
+                const volumes = await fetchEBSVolumes(ebsClient, ebsCloudWatchClient);
+                resources = volumes.map(v => ({
+                    id: v.volumeId,
+                    name: v.volumeId,
+                    displayName: `${v.volumeId} (${v.volumeType}) - ${v.state} - ${v.attachedTo}`,
+                    state: v.state,
+                    metadata: {
+                        size: v.size,
+                        volumeType: v.volumeType,
+                        attachedTo: v.attachedTo
+                    }
+                }));
+                break;
+
+            default:
+                return res.status(400).send({
+                    message: 'Invalid service specified. Must be one of: EC2, S3, RDS, Lambda, EBS'
+                });
+        }
+
+        console.log(`✅ Found ${resources.length} resources for ${service}`);
+
+        res.status(200).send({
+            service,
+            region: finalRegion,
+            resources
+        });
+
+    } catch (error) {
+        console.error('❌ Error in /api/resources:', error);
+        res.status(500).send({
+            message: error.message || 'Failed to fetch resources from AWS.',
+            service,
+            region: region || 'unknown',
+            resources: []
+        });
+    }
+});
+
 app.get('/health', (req, res) => {
   res.status(200).send({ 
     status: 'healthy', 

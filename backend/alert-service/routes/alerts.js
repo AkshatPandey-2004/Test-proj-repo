@@ -17,13 +17,15 @@ const alertSchema = Joi.object({
     duration: Joi.number().min(1).max(60).default(5)
   }).required(),
   resourceFilter: Joi.object({
-    resourceIds: Joi.array().items(Joi.string()),
-    tags: Joi.array(). items(Joi.object({
-      key: Joi. string(),
+    monitoringScope: Joi.string().valid('all', 'specific').default('all'),
+    resourceIds: Joi.array().items(Joi.string()).default([]),
+    aggregation: Joi.string().valid('average', 'maximum', 'minimum', 'sum').default('average'),
+    tags: Joi.array().items(Joi.object({
+      key: Joi.string(),
       value: Joi.string()
-    })),
-    region: Joi.string()
-  }),
+    })).default([]),
+    region: Joi.string().allow('').optional()
+  }).optional(),
   notifications: Joi.object({
     email: Joi. object({
       enabled: Joi.boolean(). default(true),

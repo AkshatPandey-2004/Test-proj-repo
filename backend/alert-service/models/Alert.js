@@ -46,7 +46,20 @@ const alertSchema = new mongoose.Schema({
   },
   resourceFilter: {
     // Optional: specific resource IDs to monitor
-    resourceIds: [String],
+    monitoringScope: {
+      type: String,
+      enum: ['all', 'specific'],
+      default: 'all'
+    },
+    resourceIds: {
+      type: [String],
+      default: []
+    },
+    aggregation: {
+      type: String,
+      enum: ['average', 'maximum', 'minimum', 'sum'],
+      default: 'average'
+    },
     tags: [{
       key: String,
       value: String

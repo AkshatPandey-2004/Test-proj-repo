@@ -49,12 +49,16 @@ module.exports = {
                 <p><strong>Current Value:</strong> <span class="metric">${currentValue}</span></p>
                 <p><strong>Severity:</strong> <span style="text-transform: uppercase; font-weight: bold;">${alert. severity}</span></p>
                 <p><strong>Triggered At:</strong> ${new Date().toLocaleString()}</p>
+                ${alert.resourceFilter?.monitoringScope === 'specific' && alert.resourceFilter?.resourceIds?.length ? `
+                  <p><strong>Monitoring Scope:</strong> Specific Resources</p>
+                  <p><strong>Aggregation:</strong> ${alert.resourceFilter.aggregation || 'average'}</p>
+                ` : `<p><strong>Monitoring Scope:</strong> All Resources (Average)</p>`}
               </div>
 
-              ${alert.resourceFilter?. resourceIds?. length ?  `
-                <p><strong>Affected Resources:</strong></p>
+              ${alert.resourceFilter?.resourceIds?.length ?  `
+                <p><strong>Monitored Resources:</strong></p>
                 <ul>
-                  ${alert.resourceFilter. resourceIds.map(id => `<li>${id}</li>`). join('')}
+                  ${alert.resourceFilter.resourceIds.map(id => `<li>${id}</li>`).join('')}
                 </ul>
               ` : ''}
 

@@ -107,17 +107,24 @@ class AlertMonitor {
   }
 
   getEC2Metric(instances, metric, filter) {
-    // Filter instances if resourceIds specified
     let targetInstances = instances;
-    if (filter?.resourceIds?. length > 0) {
-      targetInstances = instances.filter(i => filter.resourceIds.includes(i.id));
+    
+    // Filter to only running instances for CPU metrics
+    if (metric === 'cpuUtilization') {
+      targetInstances = targetInstances.filter(i => i.state === 'running');
+    }
+    
+    // If specific resources specified, filter to those
+    if (filter?.monitoringScope === 'specific' && filter?.resourceIds?.length > 0) {
+      targetInstances = targetInstances.filter(i => filter.resourceIds.includes(i.id));
     }
 
     if (targetInstances.length === 0) return null;
 
     switch (metric) {
       case 'cpuUtilization':
-        return targetInstances.reduce((sum, i) => sum + (parseFloat(i.metrics.cpuUtilization) || 0), 0) / targetInstances.length;
+        const cpuValues = targetInstances.map(i => parseFloat(i.metrics.cpuUtilization) || 0);
+        return this.applyAggregation(cpuValues, filter?.aggregation || 'average');
       
       case 'instanceCount':
         return targetInstances.length;
@@ -135,7 +142,9 @@ class AlertMonitor {
 
   getS3Metric(buckets, metric, filter) {
     let targetBuckets = buckets;
-    if (filter?.resourceIds?.length > 0) {
+    
+    // If specific resources specified, filter to those
+    if (filter?.monitoringScope === 'specific' && filter?.resourceIds?.length > 0) {
       targetBuckets = buckets.filter(b => filter.resourceIds.includes(b.name));
     }
 
@@ -143,13 +152,16 @@ class AlertMonitor {
 
     switch (metric) {
       case 'bucketSize':
-        return targetBuckets.reduce((sum, b) => sum + (parseFloat(b.sizeInGB) || 0), 0);
+        const sizeValues = targetBuckets.map(b => parseFloat(b.sizeInGB) || 0);
+        const aggregation = filter?.aggregation || 'sum';
+        return this.applyAggregation(sizeValues, aggregation);
       
       case 'bucketCount':
         return targetBuckets.length;
       
       case 'objectCount':
-        return targetBuckets.reduce((sum, b) => sum + (parseInt(b.numberOfObjects) || 0), 0);
+        const objectCounts = targetBuckets.map(b => parseInt(b.numberOfObjects) || 0);
+        return this.applyAggregation(objectCounts, filter?.aggregation || 'sum');
       
       default:
         return null;
@@ -158,7 +170,14 @@ class AlertMonitor {
 
   getRDSMetric(databases, metric, filter) {
     let targetDBs = databases;
-    if (filter?.resourceIds?.length > 0) {
+    
+    // Filter to only available databases for CPU/connections
+    if (metric === 'cpuUtilization' || metric === 'connections') {
+      targetDBs = targetDBs.filter(db => db.status === 'available');
+    }
+    
+    // If specific resources specified, filter to those
+    if (filter?.monitoringScope === 'specific' && filter?.resourceIds?.length > 0) {
       targetDBs = databases.filter(db => filter.resourceIds.includes(db.identifier));
     }
 
@@ -166,13 +185,15 @@ class AlertMonitor {
 
     switch (metric) {
       case 'cpuUtilization':
-        return targetDBs.reduce((sum, db) => sum + (parseFloat(db.metrics.cpuUtilization) || 0), 0) / targetDBs.length;
+        const cpuValues = targetDBs.map(db => parseFloat(db.metrics.cpuUtilization) || 0);
+        return this.applyAggregation(cpuValues, filter?.aggregation || 'average');
       
       case 'connections':
-        return targetDBs. reduce((sum, db) => sum + (parseInt(db.metrics.connections) || 0), 0);
+        const connValues = targetDBs.map(db => parseInt(db.metrics.connections) || 0);
+        return this.applyAggregation(connValues, filter?.aggregation || 'sum');
       
       case 'databaseCount':
-        return targetDBs. length;
+        return targetDBs.length;
       
       default:
         return null;
@@ -181,7 +202,9 @@ class AlertMonitor {
 
   getLambdaMetric(functions, metric, filter) {
     let targetFunctions = functions;
-    if (filter?.resourceIds?. length > 0) {
+    
+    // If specific resources specified, filter to those
+    if (filter?.monitoringScope === 'specific' && filter?.resourceIds?.length > 0) {
       targetFunctions = functions.filter(f => filter.resourceIds.includes(f.name));
     }
 
@@ -189,15 +212,17 @@ class AlertMonitor {
 
     switch (metric) {
       case 'errorRate':
-        const totalInvocations = targetFunctions. reduce((sum, f) => sum + (parseInt(f.metrics.invocations) || 0), 0);
+        const totalInvocations = targetFunctions.reduce((sum, f) => sum + (parseInt(f.metrics.invocations) || 0), 0);
         const totalErrors = targetFunctions.reduce((sum, f) => sum + (parseInt(f.metrics.errors) || 0), 0);
         return totalInvocations > 0 ? (totalErrors / totalInvocations) * 100 : 0;
       
       case 'invocations':
-        return targetFunctions.reduce((sum, f) => sum + (parseInt(f. metrics.invocations) || 0), 0);
+        const invocValues = targetFunctions.map(f => parseInt(f.metrics.invocations) || 0);
+        return this.applyAggregation(invocValues, filter?.aggregation || 'sum');
       
       case 'errors':
-        return targetFunctions. reduce((sum, f) => sum + (parseInt(f.metrics. errors) || 0), 0);
+        const errorValues = targetFunctions.map(f => parseInt(f.metrics.errors) || 0);
+        return this.applyAggregation(errorValues, filter?.aggregation || 'sum');
       
       default:
         return null;
@@ -206,21 +231,29 @@ class AlertMonitor {
 
   getEBSMetric(volumes, metric, filter) {
     let targetVolumes = volumes;
-    if (filter?.resourceIds?.length > 0) {
-      targetVolumes = volumes.filter(v => filter. resourceIds.includes(v.volumeId));
+    
+    // Filter to only in-use volumes for IOPS metrics
+    if (metric === 'readOps' || metric === 'writeOps') {
+      targetVolumes = targetVolumes.filter(v => v.state === 'in-use');
+    }
+    
+    // If specific resources specified, filter to those
+    if (filter?.monitoringScope === 'specific' && filter?.resourceIds?.length > 0) {
+      targetVolumes = volumes.filter(v => filter.resourceIds.includes(v.volumeId));
     }
 
     if (targetVolumes.length === 0) return null;
 
     switch (metric) {
       case 'volumeCount':
-        return targetVolumes. length;
+        return targetVolumes.length;
       
       case 'availableVolumes':
-        return targetVolumes. filter(v => v.state === 'available').length;
+        return targetVolumes.filter(v => v.state === 'available').length;
       
       case 'totalStorage':
-        return targetVolumes. reduce((sum, v) => sum + (parseFloat(v.size) || 0), 0);
+        const sizeValues = targetVolumes.map(v => parseFloat(v.size) || 0);
+        return this.applyAggregation(sizeValues, filter?.aggregation || 'sum');
       
       default:
         return null;
@@ -231,6 +264,23 @@ class AlertMonitor {
     // This would need to be implemented based on your cost data structure
     // For now, returning null as cost data structure varies
     return null;
+  }
+
+  applyAggregation(values, method) {
+    if (!values || values.length === 0) return 0;
+    
+    switch (method) {
+      case 'average':
+        return values.reduce((a, b) => a + b, 0) / values.length;
+      case 'maximum':
+        return Math.max(...values);
+      case 'minimum':
+        return Math.min(...values);
+      case 'sum':
+        return values.reduce((a, b) => a + b, 0);
+      default:
+        return values.reduce((a, b) => a + b, 0) / values.length;
+    }
   }
 
   evaluateCondition(currentValue, operator, threshold) {

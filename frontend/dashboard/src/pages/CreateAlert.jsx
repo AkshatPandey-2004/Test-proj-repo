@@ -23,7 +23,9 @@ const CreateAlert = ({ userId, onLogout }) => {
       duration: 5
     },
     resourceFilter: {
+      monitoringScope: 'all',
       resourceIds: [],
+      aggregation: 'average',
       region: 'us-east-1'
     },
     notifications: {
@@ -47,6 +49,8 @@ const CreateAlert = ({ userId, onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [availableResources, setAvailableResources] = useState([]);
+  const [loadingResources, setLoadingResources] = useState(false);
 
   const serviceMetrics = {
     'EC2': [
@@ -87,6 +91,31 @@ const CreateAlert = ({ userId, onLogout }) => {
     }
   }, [alertId]);
 
+  useEffect(() => {
+    // Fetch available resources when service changes and monitoring scope is 'specific'
+    if (formData.resourceFilter.monitoringScope === 'specific') {
+      fetchAvailableResources();
+    }
+  }, [formData.service, formData.resourceFilter.region, formData.resourceFilter.monitoringScope]);
+
+  const fetchAvailableResources = async () => {
+    setLoadingResources(true);
+    try {
+      const res = await fetch(
+        `${API_GATEWAY_URL}/api/data/resources/${userId}?service=${formData.service}&region=${formData.resourceFilter.region}`
+      );
+      const data = await res.json();
+      if (data.resources) {
+        setAvailableResources(data.resources);
+      }
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      setAvailableResources([]);
+    } finally {
+      setLoadingResources(false);
+    }
+  };
+
   const fetchAlert = async () => {
     try {
       const res = await fetch(`${API_GATEWAY_URL}/api/alerts/${userId}/${alertId}`);
@@ -105,6 +134,13 @@ const CreateAlert = ({ userId, onLogout }) => {
     setLoading(true);
     setError('');
     setSuccess('');
+
+    // Validate specific resource monitoring
+    if (formData.resourceFilter.monitoringScope === 'specific' && formData.resourceFilter.resourceIds.length === 0) {
+      setError('Please select at least one resource for specific monitoring');
+      setLoading(false);
+      return;
+    }
 
     try {
       const url = isEdit 
@@ -170,6 +206,43 @@ const CreateAlert = ({ userId, onLogout }) => {
           ...prev.notifications.email,
           recipients: prev.notifications.email.recipients.filter((_, i) => i !== index)
         }
+      }
+    }));
+  };
+
+  const toggleResourceSelection = (resourceId) => {
+    setFormData(prev => {
+      const currentIds = prev.resourceFilter.resourceIds || [];
+      const newIds = currentIds.includes(resourceId)
+        ? currentIds.filter(id => id !== resourceId)
+        : [...currentIds, resourceId];
+      
+      return {
+        ...prev,
+        resourceFilter: {
+          ...prev.resourceFilter,
+          resourceIds: newIds
+        }
+      };
+    });
+  };
+
+  const selectAllResources = () => {
+    setFormData(prev => ({
+      ...prev,
+      resourceFilter: {
+        ...prev.resourceFilter,
+        resourceIds: availableResources.map(r => r.id)
+      }
+    }));
+  };
+
+  const clearResourceSelection = () => {
+    setFormData(prev => ({
+      ...prev,
+      resourceFilter: {
+        ...prev.resourceFilter,
+        resourceIds: []
       }
     }));
   };
@@ -359,6 +432,169 @@ const CreateAlert = ({ userId, onLogout }) => {
                   <Info size={16} className="inline mr-2" />
                   Alert will trigger when: <strong>{formData.metric} {formData.condition.operator} {formData.condition.threshold}</strong> for {formData.condition.duration} minute(s)
                 </p>
+              </div>
+            </div>
+
+            {/* Resource Filter */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Resource Monitoring</h2>
+              
+              <div className="space-y-4">
+                {/* Monitoring Scope Radio Buttons */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Monitoring Scope
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="monitoringScope"
+                        value="all"
+                        checked={formData.resourceFilter.monitoringScope === 'all'}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          resourceFilter: {
+                            ...formData.resourceFilter,
+                            monitoringScope: e.target.value,
+                            resourceIds: []
+                          }
+                        })}
+                        className="mr-3"
+                      />
+                      <div>
+                        <span className="font-semibold">Monitor All Resources (Average)</span>
+                        <p className="text-sm text-gray-600">Monitor all resources of this type using average aggregation</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="monitoringScope"
+                        value="specific"
+                        checked={formData.resourceFilter.monitoringScope === 'specific'}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          resourceFilter: {
+                            ...formData.resourceFilter,
+                            monitoringScope: e.target.value
+                          }
+                        })}
+                        className="mr-3"
+                      />
+                      <div>
+                        <span className="font-semibold">Monitor Specific Resources</span>
+                        <p className="text-sm text-gray-600">Select specific resources to monitor individually</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Resource Selection (shown when specific is selected) */}
+                {formData.resourceFilter.monitoringScope === 'specific' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Select Resources
+                      </label>
+                      
+                      {loadingResources ? (
+                        <div className="p-4 border border-gray-300 rounded-lg text-center text-gray-600">
+                          Loading available resources...
+                        </div>
+                      ) : availableResources.length === 0 ? (
+                        <div className="p-4 border border-gray-300 rounded-lg text-center text-gray-600">
+                          No resources found for {formData.service} in {formData.resourceFilter.region}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex gap-2 mb-2">
+                            <button
+                              type="button"
+                              onClick={selectAllResources}
+                              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-gray-400">|</span>
+                            <button
+                              type="button"
+                              onClick={clearResourceSelection}
+                              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                          <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                            {availableResources.map((resource) => (
+                              <label
+                                key={resource.id}
+                                className="flex items-start p-3 hover:bg-gray-50 border-b border-gray-200 last:border-b-0 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={formData.resourceFilter.resourceIds.includes(resource.id)}
+                                  onChange={() => toggleResourceSelection(resource.id)}
+                                  className="mt-1 mr-3"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-800">{resource.displayName}</div>
+                                  {resource.metadata && (
+                                    <div className="text-sm text-gray-600 mt-1">
+                                      {Object.entries(resource.metadata).map(([key, value]) => (
+                                        <span key={key} className="mr-3">
+                                          {key}: {value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">
+                            {formData.resourceFilter.resourceIds.length} resource(s) selected
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Aggregation Method (shown when multiple resources selected) */}
+                    {formData.resourceFilter.resourceIds.length > 1 && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Aggregation Method
+                        </label>
+                        <select
+                          value={formData.resourceFilter.aggregation}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            resourceFilter: {
+                              ...formData.resourceFilter,
+                              aggregation: e.target.value
+                            }
+                          })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="average">Average - Calculate average across selected resources</option>
+                          <option value="maximum">Maximum - Use highest value from selected resources</option>
+                          <option value="minimum">Minimum - Use lowest value from selected resources</option>
+                          <option value="sum">Sum - Total of all selected resources</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          How to calculate the metric when monitoring multiple resources
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-700">
+                        <Info size={16} className="inline mr-2" />
+                        Make sure to select at least one resource for specific monitoring
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
