@@ -1,4 +1,9 @@
+version: '3.8'
+
 services:
+  # ========================================
+  # User Service (Port 3001)
+  # ========================================
   user-service:
     build:
       context: ./user-service
@@ -21,6 +26,9 @@ services:
       retries: 5
       start_period: 60s
 
+  # ========================================
+  # Monitoring Service (Port 3002)
+  # ========================================
   monitoring-service:
     build:
       context: ./monitoring-service
@@ -45,6 +53,9 @@ services:
       retries: 5
       start_period: 60s
 
+  # ========================================
+  # API Gateway (Port 3003)
+  # ========================================
   api-gateway:
     build:
       context: ./api-gateway
@@ -58,6 +69,7 @@ services:
       - PORT=3003
       - USER_SERVICE_URL=http://user-service:3001
       - MONITORING_SERVICE_URL=http://monitoring-service:3002
+      - ALERT_SERVICE_URL=http://alert-service:3007
     depends_on:
       user-service:
         condition: service_healthy
@@ -72,6 +84,43 @@ services:
       retries: 5
       start_period: 60s
 
+  # ========================================
+  # Alert Service (Port 3007) - NEW
+  # ========================================
+  alert-service:
+    build:
+      context: ./backend/alert-service
+      dockerfile: Dockerfile
+    container_name: cloudops-alert-service
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - ALERT_SERVICE_PORT=3007
+      - MONGO_URI=${MONGO_URI}
+      - API_GATEWAY_URL=http://api-gateway:3003
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3004}
+      # Email Configuration
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - cloudops-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ========================================
+  # Frontend (Port 3004)
+  # ========================================
   frontend:
     build:
       context: frontend/dashboard
