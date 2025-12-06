@@ -36,6 +36,13 @@ async function getCredentials(userId, regionOverride = null) {
     }
 
     const creds = data.decryptedSecret;
+    
+    // Check if credentials are null or missing - fall back to ENV
+    if (!creds.accessKeyId || !creds.secretAccessKey) {
+      console.warn('⚠️ User has no stored credentials, falling back to ENV credentials.');
+      throw new Error('No user credentials available');
+    }
+    
     console.log(`✅ Successfully retrieved credentials for user ${userId}`);
 
     return {

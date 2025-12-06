@@ -32,7 +32,12 @@ const Profile = () => {
     setFetchingData(true);
     try {
       console.log('Fetching user profile for:', userId);
-      const response = await fetch(`${API_URL}/api/user/profile/${userId}`);
+      const response = await fetch(`${API_URL}/api/profile/${userId}`);
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned non-JSON response');
+      }
       
       if (!response.ok) {
         throw new Error('Failed to fetch user data');
@@ -99,6 +104,11 @@ const Profile = () => {
         },
         body: JSON.stringify(updateData)
       });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned non-JSON response');
+      }
 
       const data = await response.json();
 

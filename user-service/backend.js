@@ -298,7 +298,16 @@ app.get('/api/user/credentials/:userId/aws', async (req, res) => {
     }
 
     if (!user.awsCredentials?.accessKeyId) {
-      return res.status(404).json({ message: 'AWS credentials not found' });
+      // Return 200 with empty credentials object instead of 404
+      // This allows monitoring service to gracefully fall back to ENV credentials
+      return res.status(200).json({ 
+        decryptedSecret: {
+          accessKeyId: null,
+          secretAccessKey: null,
+          region: user.region || 'us-east-1'
+        },
+        message: 'No AWS credentials stored for this user'
+      });
     }
 
     // Decrypt credentials
