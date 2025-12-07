@@ -11,11 +11,11 @@ class RecommendationEngine {
       
       // Fetch current resources
       const response = await axios.get(`${API_GATEWAY_URL}/api/data/metrics/${userId}`);
-      const resources = response.data. resources;
+      const resources = response.data.resources;
       
       const recommendations = [];
       
-      // 1.  Analyze EC2 Instances for idle/underutilized
+      // 1. Analyze EC2 Instances for idle/underutilized
       if (resources.ec2 && resources.ec2.length > 0) {
         const idleInstances = resources.ec2.filter(instance => {
           const cpu = parseFloat(instance.metrics.cpuUtilization);

@@ -66,8 +66,8 @@ router.get('/:userId/savings-timeline', async (req, res) => {
   try {
     const { userId } = req.params;
     const { days } = req.query;
-    const timeline = await savingsCalculator. getSavingsTimeline(userId, parseInt(days) || 30);
-    res. json({ success: true, timeline });
+    const timeline = await savingsCalculator.getSavingsTimeline(userId, parseInt(days) || 30);
+    res.json({ success: true, timeline });
   } catch (error) {
     console.error('Error fetching savings timeline:', error);
     res.status(500).json({ success: false, error: error.message });
