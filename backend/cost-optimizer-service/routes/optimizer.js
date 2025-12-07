@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const recommendationEngine = require('../services/recommendationEngine');
 const implementationService = require('../services/implementationService');
 const savingsCalculator = require('../utils/savingsCalculator');
@@ -84,7 +85,6 @@ router.post('/recommendations/:recommendationId/verify', async (req, res) => {
     
     // Force refresh AWS data before verification
     try {
-      const axios = require('axios');
       await axios.post(`${process.env.API_GATEWAY_URL || 'http://api-gateway:3003'}/api/data/refresh/${userId}`);
       await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for refresh
       console.log('✅ Data refreshed');

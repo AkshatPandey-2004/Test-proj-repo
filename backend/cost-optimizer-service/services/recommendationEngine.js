@@ -3,6 +3,9 @@ const axios = require('axios');
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:3003';
 
+// Verification thresholds
+const RDS_RIGHTSIZING_CPU_THRESHOLD = 30; // CPU% threshold for successful rightsizing
+
 class RecommendationEngine {
   
   async generateRecommendations(userId) {
@@ -179,9 +182,10 @@ class RecommendationEngine {
       
       // 6. Lambda unused functions
       if (resources.lambda && resources.lambda.length > 0) {
-        const unusedFunctions = resources.lambda.filter(fn => 
-          fn.invocations === 0 || fn.invocations === '0'
-        );
+        const unusedFunctions = resources.lambda.filter(fn => {
+          const invocations = parseInt(fn.invocations) || 0;
+          return invocations === 0;
+        });
         
         if (unusedFunctions.length > 0) {
           recommendations.push({
@@ -366,7 +370,7 @@ class RecommendationEngine {
                 return sum + (isNaN(cpu) ? 0 : cpu);
               }, 0) / matchingDBs.length;
 
-              if (avgCpu > 30) {
+              if (avgCpu > RDS_RIGHTSIZING_CPU_THRESHOLD) {
                 verified = true;
                 reason = `CPU utilization increased to ${avgCpu.toFixed(1)}% - rightsizing successful`;
               } else {
