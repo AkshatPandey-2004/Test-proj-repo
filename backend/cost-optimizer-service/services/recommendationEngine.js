@@ -288,22 +288,18 @@ class RecommendationEngine {
             const instanceIds = recommendation.resourceDetails.instances.map(i => i.id);
             const currentInstances = resources.ec2 || [];
             
-            // IMPORTANT: Terminated instances don't cost money - filter them out
-            const activeInstances = currentInstances.filter(inst => 
-              inst.state !== 'terminated'
+            // Check for instances that are still running
+            const stillRunning = currentInstances.filter(inst => 
+              instanceIds.includes(inst.id) && inst.state === 'running'
             );
 
-            const stillActive = activeInstances.filter(inst => 
-              instanceIds.includes(inst.id)
-            );
-
-            if (stillActive.length === 0) {
+            if (stillRunning.length === 0) {
               verified = true;
               reason = 'All instances stopped or terminated - no longer incurring costs';
             } else {
               verified = false;
-              const details = stillActive.map(i => `${i.name} (${i.state})`).join(', ');
-              reason = `${stillActive.length} instance(s) still active: ${details}`;
+              const details = stillRunning.map(i => `${i.name} (${i.state})`).join(', ');
+              reason = `${stillRunning.length} instance(s) still running: ${details}`;
             }
           }
           break;
