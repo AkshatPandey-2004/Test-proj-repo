@@ -13,9 +13,7 @@ import {
   Menu,
   X,
   ChevronRight,
-  Activity,
-  TrendingUp,
-  User
+  Lightbulb
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -31,6 +29,7 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
     { name: 'RDS Databases', icon: HardDrive, path: '/rds', color: 'text-purple-600', bgColor: 'bg-purple-50' },
     { name: 'Lambda Functions', icon: Zap, path: '/lambda', color: 'text-orange-600', bgColor: 'bg-orange-50' },
     { name: 'EBS Volumes', icon: Archive, path: '/ebs', color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
+    { name: 'Cost Optimizer', icon: Lightbulb, path: '/cost-optimizer', color: 'text-yellow-600', bgColor: 'bg-yellow-50' }, // ADDED
     { name: 'Alerts', icon: Bell, path: '/alerts', color: 'text-red-600', bgColor: 'bg-red-50' },
   ];
 
@@ -38,7 +37,7 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
 
   const handleNavigation = (path) => {
     navigate(path);
-    setIsOpen(false); // Close mobile menu after navigation
+    setIsOpen(false);
   };
 
   return (
@@ -54,9 +53,16 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
             >
               {isOpen ? <X size={24} className="text-gray-700" /> : <Menu size={24} className="text-gray-700" />}
             </button>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              CloudOps
-            </h1>
+            
+            {/* ADDED: Logo in mobile header */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
+                C
+              </div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                CloudOps
+              </h1>
+            </div>
           </div>
           <NotificationBell userId={userId} />
         </div>
@@ -75,16 +81,27 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       } w-72 overflow-hidden shadow-xl lg:shadow-none`}>
         
-        {/* Header */}
+        {/* Header with Logo */}
         <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-indigo-50 to-purple-50">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              CloudOps
-            </h1>
+            {/* MODIFIED: Added logo */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
+                C
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  CloudOps
+                </h1>
+                <p className="text-xs text-gray-500">Dashboard</p>
+              </div>
+            </div>
+            
             {/* Desktop Notification Bell */}
             <div className="hidden lg:block">
               <NotificationBell userId={userId} />
             </div>
+            
             {/* Mobile Close Button */}
             <button 
               onClick={() => setIsOpen(false)} 
@@ -94,9 +111,9 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
             </button>
           </div>
           
-          {/* User Info */}
+          {/* User Info - SIMPLIFIED (removed Quick Stats) */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
                 {username?. charAt(0)?.toUpperCase() || 'U'}
               </div>
@@ -105,24 +122,7 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
                 <p className="text-xs text-gray-500 truncate">{email || 'user@example.com'}</p>
               </div>
             </div>
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-indigo-50 rounded-lg p-2 text-center">
-                <p className="text-xs text-indigo-600 font-semibold mb-1">Resources</p>
-                <p className="text-lg font-bold text-indigo-700">
-                  {(metrics?.totalInstances || 0) + 
-                   (metrics?.totalS3Buckets || 0) + 
-                   (metrics?. totalRDS || 0) + 
-                   (metrics?.totalLambda || 0) + 
-                   (metrics?.totalEBS || 0)}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-2 text-center">
-                <p className="text-xs text-green-600 font-semibold mb-1">Active</p>
-                <p className="text-lg font-bold text-green-700">{metrics?.runningInstances || 0}</p>
-              </div>
-            </div>
+            {/* REMOVED: Quick Stats section */}
           </div>
         </div>
 
@@ -139,7 +139,7 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
                   onClick={() => handleNavigation(item.path)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     active
-                      ? `${item.bgColor} ${item. color} shadow-sm font-semibold`
+                      ? `${item.bgColor} ${item.color} shadow-sm font-semibold`
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
@@ -150,13 +150,13 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
                   {/* Badge for resource counts */}
                   {item. path === '/ec2' && metrics?.totalInstances > 0 && (
                     <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
-                      active ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700'
+                      active ?  'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700'
                     }`}>
-                      {metrics. totalInstances}
+                      {metrics.totalInstances}
                     </span>
                   )}
-                  {item.path === '/s3' && metrics?.totalS3Buckets > 0 && (
-                    <span className={`px-2 py-0. 5 text-xs font-bold rounded-full ${
+                  {item. path === '/s3' && metrics?.totalS3Buckets > 0 && (
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
                       active ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-700'
                     }`}>
                       {metrics.totalS3Buckets}
@@ -215,22 +215,10 @@ const Sidebar = ({ userId, username, email, onLogout, metrics }) => {
           </div>
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-4 text-white">
-            <div className="flex items-center gap-2 mb-2">
-              <Activity size={16} />
-              <span className="text-sm font-semibold">System Status</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="opacity-90">All Systems Operational</span>
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-        </div>
+        {/* REMOVED: Footer with System Status */}
       </div>
 
-      {/* Spacer for mobile to prevent content from going under header */}
+      {/* Spacer for mobile */}
       <div className="lg:hidden h-[60px]"></div>
     </>
   );
