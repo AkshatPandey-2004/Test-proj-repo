@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const recommendationEngine = require('../services/recommendationEngine');
 const implementationService = require('../services/implementationService');
 const savingsCalculator = require('../utils/savingsCalculator');
@@ -80,7 +81,20 @@ router.post('/recommendations/:recommendationId/verify', async (req, res) => {
     const { recommendationId } = req.params;
     const { userId } = req.body;
     
+    console.log(`🔍 Verifying recommendation ${recommendationId}...`);
+    
+    // Force refresh AWS data before verification
+    try {
+      await axios.post(`${process.env.API_GATEWAY_URL || 'http://api-gateway:3003'}/api/data/refresh/${userId}`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for refresh
+      console.log('✅ Data refreshed');
+    } catch (error) {
+      console.warn('⚠️ Using cached data:', error.message);
+    }
+    
     const result = await recommendationEngine.verifyImplementation(recommendationId, userId);
+    console.log(`Result: ${result.verified ? '✅ PASS' : '❌ FAIL'} - ${result.reason}`);
+    
     res.json({ success: true, ...result });
   } catch (error) {
     console.error('Error verifying recommendation:', error.message);
