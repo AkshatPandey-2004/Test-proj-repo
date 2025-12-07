@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-
+import TrendChart from "../components/TrendChart";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer
@@ -358,7 +358,49 @@ const Dashboard = ({ userId, initialRegion, onLogout }) => {
               <p className="text-xs text-gray-500 mt-2">Est. ${costData?.estimatedMonthlyTotal || '0.00'} total</p>
             </div>
           </div>
+            {/* Historical Trends Section - NEW */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Historical Trends</h2>
+                <p className="text-sm text-gray-600">Track your resource usage over time</p>
+              </div>
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* EC2 CPU Utilization Trend */}
+              <TrendChart 
+                userId={userId} 
+                service="EC2" 
+                metric="cpuUtilization"
+                title="EC2 CPU Utilization Over Time"
+              />
+
+              {/* EC2 Instance Count Trend */}
+              <TrendChart 
+                userId={userId} 
+                service="EC2" 
+                metric="instanceCount"
+                title="EC2 Instance Count Trend"
+              />
+
+              {/* S3 Bucket Count Trend */}
+              <TrendChart 
+                userId={userId} 
+                service="S3" 
+                metric="bucketCount"
+                title="S3 Bucket Count Trend"
+              />
+
+              {/* RDS Database Count Trend */}
+              <TrendChart 
+                userId={userId} 
+                service="RDS" 
+                metric="databaseCount"
+                title="RDS Database Count Trend"
+              />
+            </div>
+          </div>
           {/* Main Grid - Charts & Resources */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {/* CPU Usage Chart */}

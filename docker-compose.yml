@@ -52,7 +52,26 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-
+   # ========================================
+  # analytics-service (Port 3008)
+  # ========================================
+  analytics-service:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: Dockerfile
+    container_name: cloudops-analytics-service
+    ports:
+      - "3008:3008"
+    environment:
+      - PORT=3008
+      - MONGODB_URI=${MONGO_URI}
+      - MONITORING_SERVICE_URL=http://monitoring-service:3002
+    depends_on:
+      monitoring-service:
+        condition: service_healthy
+    networks:
+      - cloudops-network
+    restart: unless-stopped
   # ========================================
   # API Gateway (Port 3003)
   # ========================================

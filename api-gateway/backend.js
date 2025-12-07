@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3003;
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:3001';
 const MONITORING_SERVICE_URL = process.env.MONITORING_SERVICE_URL || 'http://monitoring-service:3002';
 const ALERT_SERVICE_URL = process.env.ALERT_SERVICE_URL || 'http://alert-service:3007';
+const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008';
 
 console.log('🌐 API Gateway starting...');
 console.log('📍 User Service URL:', USER_SERVICE_URL);
@@ -406,6 +407,54 @@ app.post('/api/alerts/:userId/test-email', async (req, res) => {
   }
 });
 
+// Analytics - Historical Data
+app.get('/api/analytics/:userId/metrics/history', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const response = await axios.get(`${ANALYTICS_SERVICE_URL}/api/analytics/${userId}/metrics/history`, {
+      params: req.query,
+      timeout: 10000
+    });
+    res. status(response.status).send(response.data);
+  } catch (error) {
+    console.error('❌ Analytics history error:', error. message);
+    const status = error.response ?  error.response.status : 500;
+    const message = error.response ? error. response.data : { success: false, message: 'Failed to fetch analytics' };
+    res.status(status).send(message);
+  }
+});
+
+// Analytics - Trends
+app.get('/api/analytics/:userId/metrics/trends', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const response = await axios.get(`${ANALYTICS_SERVICE_URL}/api/analytics/${userId}/metrics/trends`, {
+      params: req.query,
+      timeout: 10000
+    });
+    res.status(response.status).send(response.data);
+  } catch (error) {
+    console.error('❌ Analytics trends error:', error.message);
+    const status = error.response ? error.response.status : 500;
+    const message = error.response ? error.response.data : { success: false, message: 'Failed to fetch trends' };
+    res.status(status).send(message);
+  }
+});
+
+// Analytics - Manual Data Collection
+app.post('/api/analytics/:userId/collect', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const response = await axios.post(`${ANALYTICS_SERVICE_URL}/api/analytics/${userId}/collect`);
+    res.status(response.status).send(response.data);
+  } catch (error) {
+    console.error('❌ Analytics collection error:', error.message);
+    const status = error.response ? error.response.status : 500;
+    const message = error.response ? error.response.data : { success: false, message: 'Failed to collect data' };
+    res.status(status).send(message);
+  }
+});
+
 // Debug Cost Route
 app.get('/api/data/costs/debug/:userId', async (req, res) => {
   try {
@@ -428,4 +477,5 @@ app.listen(PORT, () => {
   console.log(`   - User Service: ${USER_SERVICE_URL}`);
   console.log(`   - Monitoring Service: ${MONITORING_SERVICE_URL}`);
   console.log(`   - Alert Service: ${ALERT_SERVICE_URL}`);
+  console.log('📍 Analytics Service URL:', ANALYTICS_SERVICE_URL);
 });
