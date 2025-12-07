@@ -96,6 +96,8 @@ const CostOptimizer = ({ userId }) => {
     setVerifying(true);
     
     try {
+      console.log('🔍 Verifying:', selectedRecommendation.title);
+      
       // Step 1: Verify changes were made
       const verifyResponse = await fetch(
         `${API_GATEWAY_URL}/api/optimizer/recommendations/${selectedRecommendation._id}/verify`,
@@ -107,9 +109,12 @@ const CostOptimizer = ({ userId }) => {
       );
 
       const verificationResult = await verifyResponse.json();
+      
+      console.log('Result:', verificationResult);
 
       // Step 2: Block if verification fails
       if (verificationResult.verified === false) {
+        console.log('❌ Failed:', verificationResult.reason);
         setAlert({
           type: 'error',
           title: 'Verification Failed',
@@ -119,6 +124,8 @@ const CostOptimizer = ({ userId }) => {
         return;
       }
 
+      console.log('✅ Passed:', verificationResult.reason);
+      
       // Step 3: Mark as implemented only if verified
       const response = await fetch(
         `${API_GATEWAY_URL}/api/optimizer/recommendations/${selectedRecommendation._id}/implement`,
@@ -441,6 +448,15 @@ const CostOptimizer = ({ userId }) => {
                                 {rec.resourceDetails.volumes.map((vol, idx) => (
                                   <div key={idx} className="mb-1">
                                     • {vol.volumeId} - {vol.size} ({vol.type})
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {rec.resourceDetails.functions && (
+                              <div>
+                                {rec.resourceDetails.functions.map((fn, idx) => (
+                                  <div key={idx} className="mb-1">
+                                    • {fn.name} ({fn.runtime})
                                   </div>
                                 ))}
                               </div>
