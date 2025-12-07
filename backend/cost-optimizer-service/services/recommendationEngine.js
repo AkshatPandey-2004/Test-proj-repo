@@ -48,7 +48,7 @@ class RecommendationEngine {
         if (stoppedInstances.length > 0) {
           recommendations.push({
             userId,
-            type: 'EC2_IDLE',
+            type: 'EC2_STOPPED',
             priority: 'Medium',
             title: `Terminate ${stoppedInstances.length} stopped EC2 instance${stoppedInstances.length > 1 ? 's' : ''}`,
             description: `${stoppedInstances.length} EC2 instance(s) are stopped.  You're still paying for EBS storage.`,
@@ -233,6 +233,127 @@ class RecommendationEngine {
     };
   }
   
+  async verifyImplementation(recommendationId, userId) {
+    try {
+      console.log(`🔍 Verifying implementation for recommendation ${recommendationId}...`);
+      
+      const recommendation = await CostRecommendation.findById(recommendationId);
+      if (!recommendation) {
+        return { verified: false, reason: 'Recommendation not found' };
+      }
+      
+      // Fetch current resources to compare
+      const response = await axios.get(`${API_GATEWAY_URL}/api/data/metrics/${userId}`);
+      const resources = response.data.resources;
+      
+      let verified = false;
+      let reason = '';
+      
+      // Verify based on recommendation type
+      switch (recommendation.type) {
+        case 'EC2_IDLE':
+          // Check if idle instances are now stopped or terminated
+          const instanceIds = recommendation.resourceDetails.instances.map(i => i.id);
+          const currentInstances = resources.ec2 || [];
+          const stillRunning = currentInstances.filter(inst => 
+            instanceIds.includes(inst.id) && inst.state === 'running'
+          );
+          
+          if (stillRunning.length === 0) {
+            verified = true;
+            reason = 'All idle instances have been stopped or terminated';
+          } else {
+            verified = false;
+            reason = `${stillRunning.length} instance(s) are still running: ${stillRunning.map(i => i.name).join(', ')}`;
+          }
+          break;
+          
+        case 'EC2_STOPPED':
+          // Check if stopped instances were terminated
+          const stoppedIds = recommendation.resourceDetails.instances.map(i => i.id);
+          const currentEC2 = resources.ec2 || [];
+          const stillExists = currentEC2.filter(inst => stoppedIds.includes(inst.id));
+          
+          if (stillExists.length === 0) {
+            verified = true;
+            reason = 'All stopped instances have been terminated';
+          } else {
+            verified = false;
+            reason = `${stillExists.length} instance(s) still exist: ${stillExists.map(i => i.name).join(', ')}`;
+          }
+          break;
+          
+        case 'EBS_UNUSED':
+          // Check if volumes were deleted
+          const volumeIds = recommendation.resourceDetails.volumes.map(v => v.volumeId);
+          const currentVolumes = resources.ebs || [];
+          const volumesStillExist = currentVolumes.filter(vol => volumeIds.includes(vol.volumeId));
+          
+          if (volumesStillExist.length === 0) {
+            verified = true;
+            reason = 'All unused EBS volumes have been deleted';
+          } else {
+            verified = false;
+            reason = `${volumesStillExist.length} volume(s) still exist: ${volumesStillExist.map(v => v.volumeId).join(', ')}`;
+          }
+          break;
+          
+        case 'RDS_RIGHTSIZING':
+          // Check if CPU utilization increased (indicates downsizing)
+          const dbIdentifiers = recommendation.resourceDetails.databases.map(db => db.identifier);
+          const currentDBs = resources.rds || [];
+          const foundDBs = currentDBs.filter(db => dbIdentifiers.includes(db.identifier));
+          
+          if (foundDBs.length === 0) {
+            verified = true;
+            reason = 'Database instances have been removed or modified';
+          } else {
+            const stillUnderutilized = foundDBs.filter(db => {
+              const cpu = parseFloat(db.metrics.cpuUtilization);
+              return !isNaN(cpu) && cpu < 20;
+            });
+            
+            if (stillUnderutilized.length === 0) {
+              verified = true;
+              reason = 'Database instances have been rightsized (CPU utilization improved)';
+            } else {
+              verified = false;
+              reason = `${stillUnderutilized.length} database(s) still underutilized`;
+            }
+          }
+          break;
+          
+        case 'S3_LIFECYCLE':
+        case 'RESERVED_INSTANCES':
+          // Manual verification required - these changes can't be automatically verified
+          verified = true;
+          reason = 'Manual verification - please confirm changes were made';
+          break;
+          
+        default:
+          verified = false;
+          reason = 'Unknown recommendation type';
+      }
+      
+      // Update verification status
+      await CostRecommendation.findByIdAndUpdate(
+        recommendationId,
+        {
+          verificationStatus: verified ? 'verified' : 'failed',
+          verificationReason: reason,
+          verifiedAt: new Date()
+        }
+      );
+      
+      console.log(`✅ Verification ${verified ? 'passed' : 'failed'}: ${reason}`);
+      return { verified, reason };
+      
+    } catch (error) {
+      console.error('❌ Error verifying implementation:', error.message);
+      return { verified: false, reason: `Verification error: ${error.message}` };
+    }
+  }
+  
   async markAsImplemented(recommendationId, actualSavings = null) {
     try {
       const update = {
@@ -244,7 +365,7 @@ class RecommendationEngine {
         update.actualSavings = actualSavings;
       }
       
-      const recommendation = await CostRecommendation. findByIdAndUpdate(
+      const recommendation = await CostRecommendation.findByIdAndUpdate(
         recommendationId,
         update,
         { new: true }

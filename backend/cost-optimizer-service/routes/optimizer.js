@@ -74,6 +74,20 @@ router.get('/:userId/savings-timeline', async (req, res) => {
   }
 });
 
+// Verify recommendation implementation
+router.post('/recommendations/:recommendationId/verify', async (req, res) => {
+  try {
+    const { recommendationId } = req.params;
+    const { userId } = req.body;
+    
+    const result = await recommendationEngine.verifyImplementation(recommendationId, userId);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error verifying recommendation:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Mark recommendation as implemented
 router.post('/recommendations/:recommendationId/implement', async (req, res) => {
   try {

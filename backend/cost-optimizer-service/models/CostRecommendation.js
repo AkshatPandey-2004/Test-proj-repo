@@ -9,7 +9,7 @@ const costRecommendationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['EC2_IDLE', 'S3_LIFECYCLE', 'RDS_RIGHTSIZING', 'EBS_UNUSED', 'RESERVED_INSTANCES', 'UNUSED_EIP', 'OLD_SNAPSHOTS', 'UNDERUTILIZED_RESOURCES']
+    enum: ['EC2_IDLE', 'EC2_STOPPED', 'S3_LIFECYCLE', 'RDS_RIGHTSIZING', 'EBS_UNUSED', 'RESERVED_INSTANCES', 'UNUSED_EIP', 'OLD_SNAPSHOTS', 'UNDERUTILIZED_RESOURCES']
   },
   priority: {
     type: String,
@@ -53,6 +53,17 @@ const costRecommendationSchema = new mongoose.Schema({
   actualSavings: {
     type: Number,
     default: 0
+  },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'failed', 'not_required'],
+    default: 'pending'
+  },
+  verificationReason: {
+    type: String
+  },
+  verifiedAt: {
+    type: Date
   },
   impact: {
     type: String,

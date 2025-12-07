@@ -4,8 +4,38 @@ import {
   Clock, Lightbulb, ArrowRight, Filter, X, 
   Server, Database, HardDrive, Package
 } from 'lucide-react';
+import Navbar from './Navbar';
 
 const API_GATEWAY_URL = "http://localhost:3003";
+
+// Custom Alert Component
+const CustomAlert = ({ type, title, message, onClose }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl mx-4">
+      <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+        type === 'success' ? 'bg-green-100' : 'bg-red-100'
+      }`}>
+        {type === 'success' ? (
+          <CheckCircle size={40} className="text-green-600" />
+        ) : (
+          <X size={40} className="text-red-600" />
+        )}
+      </div>
+      <h3 className="text-xl font-bold text-center mb-2 text-gray-800">{title}</h3>
+      <p className="text-gray-700 text-center mb-6">{message}</p>
+      <button 
+        onClick={onClose} 
+        className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+          type === 'success' 
+            ? 'bg-green-600 text-white hover:bg-green-700' 
+            : 'bg-red-600 text-white hover:bg-red-700'
+        }`}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+);
 
 const CostOptimizer = ({ userId }) => {
   const [recommendations, setRecommendations] = useState([]);
@@ -17,6 +47,8 @@ const CostOptimizer = ({ userId }) => {
   const [showImplemented, setShowImplemented] = useState(false);
   const [selectedRecommendation, setSelectedRecommendation] = useState(null);
   const [actualSavings, setActualSavings] = useState('');
+  const [alert, setAlert] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -61,7 +93,33 @@ const CostOptimizer = ({ userId }) => {
   const confirmMarkAsDone = async () => {
     if (!selectedRecommendation) return;
 
+    setVerifying(true);
+    
     try {
+      // Step 1: Verify changes were made
+      const verifyResponse = await fetch(
+        `${API_GATEWAY_URL}/api/optimizer/recommendations/${selectedRecommendation._id}/verify`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        }
+      );
+
+      const verificationResult = await verifyResponse.json();
+
+      // Step 2: Block if verification fails
+      if (verificationResult.verified === false) {
+        setAlert({
+          type: 'error',
+          title: 'Verification Failed',
+          message: verificationResult.reason || 'Changes not detected. Please make the required changes before marking as done.'
+        });
+        setVerifying(false);
+        return;
+      }
+
+      // Step 3: Mark as implemented only if verified
       const response = await fetch(
         `${API_GATEWAY_URL}/api/optimizer/recommendations/${selectedRecommendation._id}/implement`,
         {
@@ -76,16 +134,31 @@ const CostOptimizer = ({ userId }) => {
       const result = await response.json();
 
       if (result.success) {
-        alert('✅ Recommendation marked as implemented!');
+        // Step 4: Show success alert
+        setAlert({
+          type: 'success',
+          title: 'Changes Verified!',
+          message: `Recommendation successfully implemented. ${verificationResult.reason || ''}`
+        });
         setSelectedRecommendation(null);
         setActualSavings('');
         fetchData();
       } else {
-        alert(`❌ Failed: ${result.error}`);
+        setAlert({
+          type: 'error',
+          title: 'Implementation Failed',
+          message: result.error || 'Failed to mark recommendation as implemented'
+        });
       }
     } catch (error) {
       console.error('Error marking as done:', error);
-      alert('❌ Error marking recommendation as done');
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to process recommendation. Please try again.'
+      });
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -125,6 +198,12 @@ const CostOptimizer = ({ userId }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navbar */}
+      <Navbar onLogout={() => {
+        localStorage.clear();
+        window.location.href = '/login';
+      }} />
+      
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white p-8">
         <div className="max-w-7xl mx-auto">
@@ -420,6 +499,12 @@ const CostOptimizer = ({ userId }) => {
                 </p>
               </div>
 
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <span className="font-semibold">⚠️ Verification Process:</span> The system will automatically verify that you've made the required changes in AWS before marking this as complete. Changes must be verified.
+                </p>
+              </div>
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Actual Monthly Savings (optional)
@@ -436,12 +521,6 @@ const CostOptimizer = ({ userId }) => {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Leave blank to use estimated savings</p>
               </div>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-sm text-green-800">
-                  ✓ This will mark the recommendation as completed and track your savings. 
-                </p>
-              </div>
             </div>
 
             <div className="flex gap-3">
@@ -450,19 +529,38 @@ const CostOptimizer = ({ userId }) => {
                   setSelectedRecommendation(null);
                   setActualSavings('');
                 }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                disabled={verifying}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmMarkAsDone}
-                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                disabled={verifying}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Confirm
+                {verifying ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify & Confirm'
+                )}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Custom Alert */}
+      {alert && (
+        <CustomAlert
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
       )}
     </div>
   );
