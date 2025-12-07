@@ -725,6 +725,44 @@ const Dashboard = ({ userId, initialRegion, onLogout }) => {
               </div>
             </div>
           </div>
+          {/* Cost Optimization Teaser - Add this before closing the main container */}
+<div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-xl p-8 text-white mt-8">
+  <div className="flex items-center justify-between">
+    <div className="flex-1">
+      <h2 className="text-2xl font-bold mb-2">💡 Ready to Save Money?</h2>
+      <p className="text-green-100 mb-4">
+        Get AI-powered recommendations to optimize your AWS costs. 
+        Our engine analyzes your infrastructure and suggests actionable savings opportunities.
+      </p>
+      <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+            ✓
+          </div>
+          <span>Automated Analysis</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+            ✓
+          </div>
+          <span>One-Click Implementation</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+            ✓
+          </div>
+          <span>Savings Tracker</span>
+        </div>
+      </div>
+    </div>
+    <button
+      onClick={() => window.location.href = '/cost-optimizer'}
+      className="px-8 py-4 bg-white text-green-600 rounded-lg font-bold text-lg hover:bg-green-50 transition-colors shadow-lg"
+    >
+      View Recommendations →
+    </button>
+  </div>
+</div>
         </main>
       </div>
     </div>

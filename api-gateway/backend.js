@@ -13,6 +13,8 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:30
 const MONITORING_SERVICE_URL = process.env.MONITORING_SERVICE_URL || 'http://monitoring-service:3002';
 const ALERT_SERVICE_URL = process.env.ALERT_SERVICE_URL || 'http://alert-service:3007';
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008';
+const COST_OPTIMIZER_SERVICE_URL = process.env.COST_OPTIMIZER_SERVICE_URL || 'http://cost-optimizer-service:3009/api/optimizer';
+
 
 console.log('🌐 API Gateway starting...');
 console.log('📍 User Service URL:', USER_SERVICE_URL);
@@ -468,6 +470,24 @@ app.get('/api/data/costs/debug/:userId', async (req, res) => {
     const status = error.response ? error.response.status : 500;
     const message = error.response ? error.response.data : { message: 'Debug failed' };
     res.status(status).send(message);
+  }
+});
+
+// Cost Optimizer Service Routes
+app.use('/api/optimizer', async (req, res) => {
+  try {
+    const response = await axios({
+      method: req.method,
+      url: `${COST_OPTIMIZER_SERVICE_URL}${req.url}`,
+      data: req.body,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error proxying to cost-optimizer-service:', error. message);
+    res.status(error.response?.status || 500). json({
+      error: error.response?.data || 'Cost optimizer service unavailable'
+    });
   }
 });
 

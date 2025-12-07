@@ -8,7 +8,7 @@ import Register from './pages/Register';
 
 // Main Dashboard
 import Dashboard from './pages/Dashboard';
-
+import CostOptimizer from './components/CostOptimizer';
 // Service Dashboards
 import EC2Dashboard from './pages/EC2Dashboard';
 import S3Dashboard from './pages/S3Dashboard';
@@ -111,6 +111,14 @@ function App() {
               <Navigate to="/login" />
             )
           }
+        />
+        <Route 
+          path="/cost-optimizer" 
+          element={
+            isAuthenticated ? 
+            <CostOptimizer userId={userId} /> : 
+            <Navigate to="/login" />
+          } 
         />
 
         {/* Protected Routes - Service Dashboards */}

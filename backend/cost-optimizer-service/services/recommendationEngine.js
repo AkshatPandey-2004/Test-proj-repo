@@ -7,15 +7,15 @@ class RecommendationEngine {
   
   async generateRecommendations(userId) {
     try {
-      console.log(`Ì¥ñ Generating cost recommendations for user ${userId}...`);
+      console.log(`ü§ñ Generating cost recommendations for user ${userId}...`);
       
       // Fetch current resources
       const response = await axios.get(`${API_GATEWAY_URL}/api/data/metrics/${userId}`);
-      const resources = response.data.resources;
+      const resources = response.data. resources;
       
       const recommendations = [];
       
-      // 1. Analyze EC2 Instances for idle/underutilized
+      // 1.  Analyze EC2 Instances for idle/underutilized
       if (resources.ec2 && resources.ec2.length > 0) {
         const idleInstances = resources.ec2.filter(instance => {
           const cpu = parseFloat(instance.metrics.cpuUtilization);
@@ -29,13 +29,13 @@ class RecommendationEngine {
             type: 'EC2_IDLE',
             priority: 'High',
             title: `Stop ${idleInstances.length} idle EC2 instance${idleInstances.length > 1 ? 's' : ''}`,
-            description: `${idleInstances.length} EC2 instance(s) running with less than 5% CPU utilization.  Consider stopping or downsizing. `,
+            description: `${idleInstances.length} EC2 instance(s) running with less than 5% CPU utilization. Consider stopping or downsizing. `,
             estimatedMonthlySavings: savings,
             estimatedYearlySavings: savings * 12,
             difficulty: 'Easy',
             implementationTime: '2 minutes',
             resourceDetails: {
-              instances: idleInstances. map(i => ({ id: i.id, name: i.name, cpu: i.metrics.cpuUtilization }))
+              instances: idleInstances.map(i => ({ id: i.id, name: i.name, cpu: i.metrics.cpuUtilization }))
             },
             impact: 'Low Impact',
             category: 'Compute',
@@ -50,10 +50,10 @@ class RecommendationEngine {
             userId,
             type: 'EC2_IDLE',
             priority: 'Medium',
-            title: `Terminate ${stoppedInstances. length} stopped EC2 instance${stoppedInstances.length > 1 ? 's' : ''}`,
-            description: `${stoppedInstances.length} EC2 instance(s) are stopped. You're still paying for EBS storage.`,
+            title: `Terminate ${stoppedInstances.length} stopped EC2 instance${stoppedInstances.length > 1 ? 's' : ''}`,
+            description: `${stoppedInstances.length} EC2 instance(s) are stopped.  You're still paying for EBS storage.`,
             estimatedMonthlySavings: stoppedInstances.length * 8,
-            estimatedYearlySavings: stoppedInstances. length * 8 * 12,
+            estimatedYearlySavings: stoppedInstances.length * 8 * 12,
             difficulty: 'Easy',
             implementationTime: '1 minute',
             resourceDetails: {
@@ -77,7 +77,7 @@ class RecommendationEngine {
             type: 'S3_LIFECYCLE',
             priority: 'Medium',
             title: `Enable S3 Lifecycle policies on ${largeBuckets.length} bucket${largeBuckets.length > 1 ? 's' : ''}`,
-            description: `Move infrequently accessed data to S3 Glacier to reduce storage costs by up to 70%.`,
+            description: `Move infrequently accessed data to S3 Glacier to reduce storage costs by up to 70%. `,
             estimatedMonthlySavings: savings,
             estimatedYearlySavings: savings * 12,
             difficulty: 'Medium',
@@ -106,7 +106,7 @@ class RecommendationEngine {
             type: 'RDS_RIGHTSIZING',
             priority: 'High',
             title: `Downsize ${underutilizedDBs.length} over-provisioned RDS database${underutilizedDBs. length > 1 ? 's' : ''}`,
-            description: `RDS instances running at <20% CPU.  Consider downsizing to a smaller instance type. `,
+            description: `RDS instances running at <20% CPU.  Consider downsizing to a smaller instance type.`,
             estimatedMonthlySavings: savings,
             estimatedYearlySavings: savings * 12,
             difficulty: 'Medium',
@@ -135,7 +135,7 @@ class RecommendationEngine {
             userId,
             type: 'EBS_UNUSED',
             priority: 'High',
-            title: `Delete ${unattachedVolumes.length} unused EBS volume${unattachedVolumes. length > 1 ? 's' : ''}`,
+            title: `Delete ${unattachedVolumes. length} unused EBS volume${unattachedVolumes. length > 1 ? 's' : ''}`,
             description: `${totalSize} GB of unattached EBS volumes costing you money. `,
             estimatedMonthlySavings: savings,
             estimatedYearlySavings: savings * 12,
@@ -152,8 +152,8 @@ class RecommendationEngine {
       }
       
       // 5. Reserved Instance Recommendation
-      if (resources.ec2 && resources.ec2. length >= 2) {
-        const runningCount = resources.ec2.filter(i => i.state === 'running').length;
+      if (resources.ec2 && resources.ec2.length >= 2) {
+        const runningCount = resources.ec2. filter(i => i.state === 'running').length;
         if (runningCount >= 2) {
           const savings = Math.round(runningCount * 15 * 0.4); // 40% savings
           recommendations.push({
@@ -190,7 +190,7 @@ class RecommendationEngine {
       return { success: true, count: recommendations.length, recommendations };
       
     } catch (error) {
-      console.error(`‚ùå Error generating recommendations:`, error.message);
+      console. error(`‚ùå Error generating recommendations:`, error.message);
       return { success: false, error: error. message };
     }
   }
@@ -203,15 +203,15 @@ class RecommendationEngine {
         query.implemented = filters.implemented;
       }
       
-      if (filters.priority) {
+      if (filters. priority) {
         query.priority = filters.priority;
       }
       
-      if (filters.category) {
+      if (filters. category) {
         query.category = filters.category;
       }
       
-      const recommendations = await CostRecommendation.find(query). sort({ priority: 1, estimatedMonthlySavings: -1 });
+      const recommendations = await CostRecommendation.find(query).sort({ priority: 1, estimatedMonthlySavings: -1 });
       
       return recommendations;
     } catch (error) {
@@ -244,7 +244,7 @@ class RecommendationEngine {
         update.actualSavings = actualSavings;
       }
       
-      const recommendation = await CostRecommendation.findByIdAndUpdate(
+      const recommendation = await CostRecommendation. findByIdAndUpdate(
         recommendationId,
         update,
         { new: true }

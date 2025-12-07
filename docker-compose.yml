@@ -138,6 +138,25 @@ services:
       start_period: 60s
 
   # ========================================
+  # Cost Optimizer Service (Port 3009)
+  # ========================================
+  cost-optimizer-service:
+    build: ./backend/cost-optimizer-service
+    container_name: cloudops-cost-optimizer
+    ports:
+      - "3009:3009"
+    environment:
+      - PORT=3009
+      - MONGODB_URI=mongodb+srv://Admin:akshat@cluster0.cdoux4f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+      - API_GATEWAY_URL=http://api-gateway:3003
+      - MONITORING_SERVICE_URL=http://monitoring-service:3002
+      - DEFAULT_USER_ID=6933a85c2c75b5a8192c2de4
+    networks:
+      - cloudops-network
+    depends_on:
+      - api-gateway
+      - monitoring-service
+  # ========================================
   # Frontend (Port 3004)
   # ========================================
   frontend:
